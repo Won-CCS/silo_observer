@@ -124,6 +124,7 @@ class SiloObserver(Node):
                 count += 1
             
         except TransformException as ex:
+            pass
             # self.get_logger().info(
             #     f'Could not transform {to_frame_rel} to {from_frame_rel}: {ex}')
             # return

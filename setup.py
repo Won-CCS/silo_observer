@@ -21,6 +21,7 @@ setup(
     entry_points={
         'console_scripts': [
             'silo_observer_node = silo_observer.silo_observer_node:main',
+            'silo_predictor_node = silo_observer.silo_predictor_node:main',
             'image_window_operator_node = silo_observer.image_window_operator_node:main',
             'static_base_link_broadcaster = silo_observer.static_base_link_broadcaster:main',
             'silo_coordinates_broadcaster = silo_observer.silo_coordinates_broadcaster:main'

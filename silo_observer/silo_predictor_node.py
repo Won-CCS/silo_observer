@@ -31,7 +31,7 @@ class Coordinate:
         self.theta = theta
 
 class Camera:
-    def __init__(self):
+    # def __init__(self):
         # 外部パラメータ
         # self.rmat = np.array([[0, -1, 0], 
         #                     [0, 0, -1], 
@@ -85,7 +85,7 @@ class SiloObserver(Node):
         self.silos = {"a": Silo(Coordinate(0, 0, 100, 0)), "b": Silo(Coordinate(0, 0, 100, 0)), "c": Silo(Coordinate(0, 0, 100, 0)), "d": Silo(Coordinate(0, 0, 100, 0)), "e": Silo(Coordinate(0, 0, 100, 0))}
 
         # 過去の状態を保存するキュー
-        self.past_states = queue.Queue()
+        self.past_statuses = queue.Queue()
 
         # on_timer関数を0.1秒ごとに実行
         self.timer = self.create_timer(0.1, self.on_timer)
@@ -124,38 +124,42 @@ class SiloObserver(Node):
         # 状態を保存
         if self.past_statuses.qsize() > 10:
             self.past_statuses.get()
-            self.past_statuses.put([self.silos["a"], self.silos["b"], self.silos["c"], self.silos["d"], self.silos["d"], self.silos["e"]])
-        elif self.past_statuses.qsize() <= 10:
-            self.past_statuses.put([self.silos["a"], self.silos["b"], self.silos["c"], self.silos["d"], self.silos["d"], self.silos["e"]]) 
+        self.past_statuses.put([[self.silos["a"].red_balls, self.silos["a"].blue_balls, self.silos["a"].purple_balls],
+                                [self.silos["b"].red_balls, self.silos["b"].blue_balls, self.silos["b"].purple_balls],
+                                [self.silos["c"].red_balls, self.silos["c"].blue_balls, self.silos["c"].purple_balls],
+                                [self.silos["d"].red_balls, self.silos["d"].blue_balls, self.silos["d"].purple_balls],
+                                [self.silos["e"].red_balls, self.silos["e"].blue_balls, self.silos["e"].purple_balls],
+                                ])
         
         # 過去の状態で最も多い状態を取得し、publish
         past_statuses = self.past_statuses.queue
-        public_silos = [None] * NUMBER_OF_SILOS
+        correct_statuses = [None] * NUMBER_OF_SILOS
+        # サイロごとに過去状態を取得し、最も多い状態を正しい状態とする
         for i in range(NUMBER_OF_SILOS):
             past_status = []
             for j in range(len(past_statuses)):
                 past_status.append(past_statuses[j][i]) 
             counter = Counter(map(tuple, past_status))
             most_common_status = max(counter, key=counter.get)
-            public_silos[i] = list(most_common_status)
+            correct_statuses[i] = list(most_common_status)
 
         # 状態を詰めてpublish
         msg = SilosStatus()
-        msg.a.red = public_silos["a"].red_balls
-        msg.a.blue = public_silos["a"].blue_balls
-        msg.a.purple = public_silos["a"].purple_balls
-        msg.b.red = public_silos["b"].red_balls
-        msg.b.blue = public_silos["b"].blue_balls
-        msg.b.purple = public_silos["b"].purple_balls
-        msg.c.red = public_silos["c"].red_balls
-        msg.c.blue = public_silos["c"].blue_balls
-        msg.c.purple = public_silos["c"].purple_balls
-        msg.d.red = public_silos["d"].red_balls
-        msg.d.blue = public_silos["d"].blue_balls
-        msg.d.purple = public_silos["d"].purple_balls
-        msg.e.red = public_silos["e"].red_balls
-        msg.e.blue = public_silos["e"].blue_balls
-        msg.e.purple = public_silos["e"].purple_balls
+        msg.a.red = correct_statuses[0][0]
+        msg.a.blue = correct_statuses[0][1]
+        msg.a.purple = correct_statuses[0][2]
+        msg.b.red = correct_statuses[1][0]
+        msg.b.blue = correct_statuses[1][1]
+        msg.b.purple = correct_statuses[1][2]
+        msg.c.red = correct_statuses[2][0]
+        msg.c.blue = correct_statuses[2][1]
+        msg.c.purple = correct_statuses[2][2]
+        msg.d.red = correct_statuses[3][0]
+        msg.d.blue = correct_statuses[3][1]
+        msg.d.purple = correct_statuses[3][2]
+        msg.e.red = correct_statuses[4][0]
+        msg.e.blue = correct_statuses[4][1]
+        msg.e.purple = correct_statuses[4][2]
 
         self.publisher.publish(msg)
 
@@ -169,7 +173,7 @@ class SiloObserver(Node):
         self.silos = self.check_detection(self.silos)
         
         #画像内のサイロをYOLOで検出
-        model = YOLO("../best.pt")
+        model = YOLO("/home/crs3/nhk24/nhk24_ws/src/silo_observer/silo_observer/best.pt")
         results = model(frame, show=True)
     
         return results
@@ -231,7 +235,7 @@ class SiloObserver(Node):
         # YOLOで検出したサイロの中心座標と自己位置をもとにしたサイロの中心座標から、YOLOで検出したサイロがどのサイロに対応するかを判定
         # その後、サイロにボールの数を記録
         for silo_x_center, silo_balls in zip(silos_x_center, silos_balls):
-            for silo in silos:
+            for silo in silos.values():
                 if abs(silo_x_center - silo.image_coordinate[0]) < 20 and silo.detection_flag == True:
                     silo.red_balls = silo_balls.count("red")
                     silo.blue_balls = silo_balls.count("blue")
@@ -254,8 +258,8 @@ class SiloObserver(Node):
             rclpy.shutdown()
 
     #歪みを考慮した座標変換
-    def convert_camera_to_image_coordinate(silos, camera):
-        for silo in silos:
+    def convert_camera_to_image_coordinate(self, silos, camera):
+        for silo in silos.values():
             x = silo.camera_coordinate[0] / silo.camera_coordinate[2]
             y = silo.camera_coordinate[1] / silo.camera_coordinate[2]
             r_squared_2 = x ** 2 + y ** 2
@@ -268,8 +272,8 @@ class SiloObserver(Node):
             
         return silos
 
-    def check_detection(silos):
-        for silo in silos:
+    def check_detection(self, silos):
+        for silo in silos.values():
             if(0 < silo.image_coordinate[0] < 640 and 0 < silo.image_coordinate[1] < 480):
                 silo.detection_flag = True
             else:
