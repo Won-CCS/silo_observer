@@ -81,6 +81,8 @@ class SiloObserver(Node):
 
         self.publisher = self.create_publisher(SilosStatus, 'silos_status', 1)
 
+        self.model = YOLO("/home/crs3/nhk24/nhk24_ws/src/silo_observer/silo_observer/best.pt")
+
         self.camera = Camera()
         self.silos = {"a": Silo(Coordinate(0, 0, 100, 0)), "b": Silo(Coordinate(0, 0, 100, 0)), "c": Silo(Coordinate(0, 0, 100, 0)), "d": Silo(Coordinate(0, 0, 100, 0)), "e": Silo(Coordinate(0, 0, 100, 0))}
 
@@ -119,7 +121,7 @@ class SiloObserver(Node):
         # 現在のサイロ内部の状態を取得
         results = self.get_silos_status(frame)
         self.silos = self.detect_balls(results, self.silos)
-        # self.show_silos_in_image(frame)
+        self.show_silos_in_image(frame, results)
 
         # 状態を保存
         if self.past_statuses.qsize() > 10:
@@ -173,8 +175,7 @@ class SiloObserver(Node):
         self.silos = self.check_detection(self.silos)
         
         #画像内のサイロをYOLOで検出
-        model = YOLO("/home/crs3/nhk24/nhk24_ws/src/silo_observer/silo_observer/best.pt")
-        results = model(frame, show=True)
+        results = self.model(frame, show=False)
     
         return results
     
@@ -244,12 +245,10 @@ class SiloObserver(Node):
                     
         return silos
     
-    def show_silos_in_image(self, frame):
+    def show_silos_in_image(self, frame, results):
         # サイロ位置を示したカメラ画像を表示
-        for silo in self.silos:
-            if silo.detection_flag == True:
-                cv2.circle(frame, (int(silo.bottom_image_coordinate[0][0]), int(silo.bottom_image_coordinate[1][0])), 10, (0, 0, 255), thickness=cv2.FILLED)
-                cv2.circle(frame, (int(silo.top_image_coordinate[0][0]), int(silo.top_image_coordinate[1][0])), 10, (0, 0, 255), thickness=cv2.FILLED)
+        for result in results:
+                cv2.rectangle(frame, (result[0], result[1]), (result[2], result[3]), (0, 0, 255), 2)
         cv2.namedWindow('Detected', cv2.WINDOW_NORMAL)
         cv2.imshow('Detected', frame)
 
